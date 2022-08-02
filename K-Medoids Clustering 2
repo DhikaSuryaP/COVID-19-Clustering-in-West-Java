@@ -3,29 +3,41 @@ library(TSdist)
 library(factoextra)
 library(NbClust)
 library(reshape)
-
+library(clValid)
 
 data<-read.csv("DAILY.csv",header=TRUE,sep=";")
 names(data[1,]) <- format(as.Date(names(data[1,]), format = "%d.%m.%y"),format = "%Y-%m-%d")
 data<-na.omit(data)
 data2<-(data[,-1])
 
-# Elbow method
+#Elbow method#
 fviz_nbclust(data2,cluster::pam,method = "wss")+
     geom_vline(xintercept = 4, linetype = 2)+
   labs(subtitle = "Elbow Method")
 
-#Cross Correlation Based Distance
+#KMedoids Clustering#
 ClusterCor<-KMedoids(data2,4,distance="ccor")
 ClusterProvinsi<-cbind(ClusterCor,data)
 Cluster1<-ClusterProvinsi[ClusterProvinsi$ClusterCor=="1",]
 Cluster2<-ClusterProvinsi[ClusterProvinsi$ClusterCor=="2",]
 Cluster3<-ClusterProvinsi[ClusterProvinsi$ClusterCor=="3",]
 Cluster4<-ClusterProvinsi[ClusterProvinsi$ClusterCor=="4",]
-head(Cluster1)
+
+#Cluster Validation#
+distance=dist(data2,method="correlation")
+connectivity(distance=distance, ClusterCor, Data = data2)
+dunn(distance=distance,ClusterCor,Data=data2)
+Validation <- clValid(data2, 2:10, clMethods = c("pam"), validation = 
+	c("internal"),metric="correlation",maxitems="27",verbose=TRUE)
+summary(Validation)
+plot(Validation)
+
+sil=silhouette(dist=distance,ClusterCor)
+windows()
+plot(sil)
+
 
 #Visualization#
-
 
 #Cluster 1#
 Cluster1s <-(melt(Cluster1,id.vars=c("Row.Labels"),value.name=c("value"),variable.name=c("day")))[c(-1:-14),]
@@ -53,7 +65,4 @@ Cluster4s <-(melt(Cluster4,id.vars=c("Row.Labels"),value.name=c("value"),variabl
 Cluster4s$variable <-as.Date(Cluster3s$variable, format="X%d.%m.%Y")
 covid_plot <- ggplot(data=Cluster4s, aes(x=variable, y=value, group = Row.Labels,
                                             colour = Row.Labels)) 
-covid_plot + ggtitle("Daily New Case for Cluster 4")+ geom_line() + labs(y = "New Case", x = "Day", colour="Cities/Regencies")
-
-
-
+covid_plot + ggtitle("Daily New Case for Cluster 4")+ geom_line() + labs(y = "COVID-19 Daily Positive Case", x = "Day", colour="Cities/Regencies")
